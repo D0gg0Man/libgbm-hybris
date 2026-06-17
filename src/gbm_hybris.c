@@ -152,19 +152,8 @@ static struct gbm_bo *surface_lock_front(struct gbm_surface *s) {
     if (drm_shim_register_bo)
         drm_shim_register_bo((uint32_t)surf->front->prime_fd, surf->front->handle);
     LOG("lock_front fd=%d fb_id=%u", surf->front->prime_fd, surf->front->fb_id);
-    /* Present rendered buffer via HWC2 - look in all loaded libs */
-    typedef void (*present_fn)(void*, int, int, int);
-    static present_fn hwc2_present = NULL;
-    if (!hwc2_present) {
-        hwc2_present = dlsym(RTLD_DEFAULT, "gnome_mali_hwc2_present_gralloc");
-        if (!hwc2_present) {
-            void *egl = dlopen("libEGL_hybris_wrapper.so", RTLD_NOLOAD|RTLD_LAZY);
-            if (egl) hwc2_present = dlsym(egl, "gnome_mali_hwc2_present_gralloc");
-        }
-        LOG("hwc2_present=%p", (void*)hwc2_present);
-    }
-    if (hwc2_present && surf->front->handle)
-        hwc2_present((void*)surf->front->handle, s->v0.width, s->v0.height, surf->front->stride_bytes/4);
+    /* Presentation is handled by the drmadapter EGL platform (HWC2);
+     * the gbm surface only needs to hand back the locked front buffer. */
     return &surf->front->base;
 }
 
@@ -198,7 +187,6 @@ static struct gbm_device *create_device(int fd, uint32_t version) {
     dev->v0.surface_release_buffer = surface_release;
     dev->v0.surface_has_free_buffers = surface_has_free;
     dev->v0.surface_destroy = surface_destroy;
-    { typedef void (*fn)(void*); fn f = dlsym(RTLD_DEFAULT, "hybris_vendor_set_gbm_device"); if (f) f(dev); }
     return dev;
 }
 
