@@ -55,7 +55,6 @@ struct hybris_bo {
     buffer_handle_t handle;
     int prime_fd;
     uint32_t stride_bytes;
-    uint32_t fb_id; /* set after AddFB */
 };
 
 struct hybris_surface {
@@ -147,7 +146,7 @@ static struct gbm_bo *surface_lock_front(struct gbm_surface *s) {
     ensure_shim();
     if (drm_shim_register_bo)
         drm_shim_register_bo((uint32_t)surf->front->prime_fd, surf->front->handle);
-    LOG("lock_front fd=%d fb_id=%u", surf->front->prime_fd, surf->front->fb_id);
+    LOG("lock_front fd=%d", surf->front->prime_fd);
     /* Presentation is handled by the drmadapter EGL platform (HWC2);
      * the gbm surface only needs to hand back the locked front buffer. */
     return &surf->front->base;
