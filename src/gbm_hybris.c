@@ -132,10 +132,6 @@ static struct gbm_surface *surface_create(struct gbm_device *gbm, uint32_t w, ui
     surf->back = alloc_bo(gbm, w, h, fmt);
     if (!surf->back) { free(surf); return NULL; }
     LOG("Surface %dx%d fmt=0x%x", w, h, fmt);
-    /* Register with EGL vendor so it knows this is a GBM surface */
-    typedef void (*reg_fn)(void*);
-    reg_fn reg = dlsym(RTLD_DEFAULT, "egl_vendor_register_surface");
-    if (reg) reg(&surf->base);
     return &surf->base;
 }
 
