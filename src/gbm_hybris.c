@@ -82,6 +82,12 @@ static struct hybris_bo *alloc_bo(struct gbm_device *gbm, uint32_t w, uint32_t h
     hbo->base.v0.format = fmt;
     hbo->base.v0.handle.s32 = nh->data[0];
     LOG("BO %dx%d fmt=0x%x stride=%d fd=%d", w, h, fmt, hbo->stride_bytes, hbo->prime_fd);
+    /* Register so the DRM shim (KMS faking) and libhybris (dmabuf->native EGL
+     * image bridge) can recover the gralloc handle from this bo's prime fd.
+     * Allocator bos (wlroots) skipped the surface-path registration before. */
+    ensure_shim();
+    if (drm_shim_register_bo)
+        drm_shim_register_bo((uint32_t)hbo->prime_fd, hbo->handle);
     return hbo;
 }
 
@@ -112,11 +118,20 @@ static void *bo_map(struct gbm_bo *bo, uint32_t x, uint32_t y, uint32_t w, uint3
 }
 static void bo_unmap(struct gbm_bo *bo, void *d) { hybris_gralloc_unlock(((struct hybris_bo*)bo)->handle); }
 static int bo_write(struct gbm_bo *bo, const void *buf, size_t data) { return -1; }
-static int bo_get_fd(struct gbm_bo *bo) { return dup(((struct hybris_bo*)bo)->prime_fd); }
+static int bo_reg_fd(struct hybris_bo *hbo) {
+    int fd = dup(hbo->prime_fd);
+    /* Register the exact fd we hand out so a dmabuf->gralloc lookup keyed on
+     * the fd value (libhybris EGL image bridge, libdrm-hybris KMS) succeeds. */
+    ensure_shim();
+    if (drm_shim_register_bo && fd >= 0)
+        drm_shim_register_bo((uint32_t)fd, hbo->handle);
+    return fd;
+}
+static int bo_get_fd(struct gbm_bo *bo) { return bo_reg_fd((struct hybris_bo*)bo); }
 static int bo_get_planes(struct gbm_bo *bo) { return 1; }
 static union gbm_bo_handle bo_get_handle(struct gbm_bo *bo, int plane) {
     union gbm_bo_handle h; h.s32 = ((struct hybris_bo*)bo)->prime_fd; return h; }
-static int bo_get_plane_fd(struct gbm_bo *bo, int plane) { return dup(((struct hybris_bo*)bo)->prime_fd); }
+static int bo_get_plane_fd(struct gbm_bo *bo, int plane) { return bo_reg_fd((struct hybris_bo*)bo); }
 static uint32_t bo_get_stride(struct gbm_bo *bo, int plane) { return ((struct hybris_bo*)bo)->stride_bytes; }
 static uint32_t bo_get_offset(struct gbm_bo *bo, int plane) { return 0; }
 static uint64_t bo_get_modifier(struct gbm_bo *bo) { return 0; }
