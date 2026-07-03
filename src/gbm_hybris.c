@@ -68,9 +68,17 @@ static struct hybris_bo *alloc_bo(struct gbm_device *gbm, uint32_t w, uint32_t h
     struct hybris_bo *hbo = calloc(1, sizeof(*hbo));
     if (!hbo) return NULL;
     uint32_t stride_px = 0;
+    /* GBM_HYBRIS_LINEAR=1: add CPU-usage bits so gralloc picks a LINEAR
+     * (non-AFBC) layout. On some Mali/MTK combos an AFBC render buffer draws
+     * fine in the owning context but samples as garbage/black when imported
+     * into ANOTHER EGL context (a per-allocation, per-boot lottery) -- the
+     * drmadapter scanout blitter needs cross-context sampling to work, so its
+     * session sets this. */
+    uint64_t usage = HYBRIS_USAGE_HW_RENDER|HYBRIS_USAGE_HW_TEXTURE|HYBRIS_USAGE_HW_COMPOSER;
+    if (getenv("GBM_HYBRIS_LINEAR"))
+        usage |= 0x3 /* SW_READ_OFTEN */ | 0x30 /* SW_WRITE_OFTEN */;
     int ret = hybris_gralloc_allocate(w, h, gbm_to_hybris_format(fmt),
-        HYBRIS_USAGE_HW_RENDER|HYBRIS_USAGE_HW_TEXTURE|HYBRIS_USAGE_HW_COMPOSER,
-        &hbo->handle, &stride_px);
+        usage, &hbo->handle, &stride_px);
     if (ret) { LOG("alloc failed %d", ret); free(hbo); return NULL; }
     const native_handle_t *nh = (const native_handle_t *)hbo->handle;
     if (nh->numFds < 1) { hybris_gralloc_release(hbo->handle,1); free(hbo); return NULL; }
