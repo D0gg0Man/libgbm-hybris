@@ -64,6 +64,7 @@ struct hybris_surface {
 };
 
 static struct hybris_bo *alloc_bo(struct gbm_device *gbm, uint32_t w, uint32_t h, uint32_t fmt) {
+    if (getenv("GBM_HYBRIS_TRACE")) fprintf(stderr, "gbm-hybris: alloc_bo %ux%u fmt=0x%x\n", w, h, fmt);
     if (ensure_gralloc()) return NULL;
     struct hybris_bo *hbo = calloc(1, sizeof(*hbo));
     if (!hbo) return NULL;
